@@ -13,6 +13,7 @@ class HelperTestCase(unittest.TestCase):
             1339502673,
         )
 
+
 class CacheTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -26,14 +27,112 @@ class CacheTestCase(unittest.TestCase):
         self.cache.put('baz', 'qux', -1)
         self.assertEqual(self.cache.get('baz'), None)
 
+
+class APIRequestTest(unittest.TestCase):
+
+    def setUp(self):
+        self.api = mock.Mock()
+        self.api.CACHE_VERSION = 1
+        self.api.base_url = 'api.eveonline.com'
+        self.api.api_key = None
+
+
+    def test_request_eq(self):
+        self.assertEqual(
+            evelink_api.APIRequest(self.api, 'foo/bar', {}),
+            evelink_api.APIRequest(self.api, 'foo/bar', {})
+        )
+        self.assertEqual(
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {})),
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {}))
+        )
+
+        self.assertEqual(
+            evelink_api.APIRequest(self.api, 'foo/bar', {'a': 1, 'b': 2}),
+            evelink_api.APIRequest(self.api, 'foo/bar', {'b': 2, 'a': 1})
+        )
+        self.assertEqual(
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {'a': 1, 'b': 2})),
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {'b': 2, 'a': 1}))
+        )
+
+    def test_request_with_api_key_eq(self):
+        self.api.api_key = (1, 'code',)
+        self.assertEqual(
+            evelink_api.APIRequest(self.api, 'foo/bar', {}),
+            evelink_api.APIRequest(self.api, 'foo/bar', {})
+        )
+
+        self.assertEqual(
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {})),
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {}))
+        )
+
+    def test_request_not_eq(self):
+        self.assertNotEqual(
+            evelink_api.APIRequest(self.api, 'foo/bar', {}),
+            evelink_api.APIRequest(self.api, 'foo/baz', {})
+        )
+        self.assertNotEqual(
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {})),
+            str(evelink_api.APIRequest(self.api, 'foo/baz', {}))
+        )
+
+        self.assertNotEqual(
+            evelink_api.APIRequest(self.api, 'foo/bar', {'a': 1}),
+            evelink_api.APIRequest(self.api, 'foo/bar', {'a': 2})
+        )
+        self.assertNotEqual(
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {'a': 1})),
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {'a': 2}))
+        )
+
+        self.assertNotEqual(
+            evelink_api.APIRequest(self.api, 'foo/bar', {'a': 1}),
+            evelink_api.APIRequest(self.api, 'foo/bar', {'b': 1})
+        )
+        self.assertNotEqual(
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {'a': 1})),
+            str(evelink_api.APIRequest(self.api, 'foo/bar', {'b': 1}))
+        )
+
+    def test_request_with_api_key_not_eq(self):
+        self.api.api_key = (1, 'code',)
+        req1 = evelink_api.APIRequest(self.api, 'foo/bar', {})
+
+        self.api.api_key = (2, 'code',)
+        req2 = evelink_api.APIRequest(self.api, 'foo/bar', {})
+
+
+        self.assertNotEqual(req1, req2)
+        self.assertNotEqual(str(req1), str(req2))
+
+    @unittest.skip("base url not part of the cache key hash")
+    def test_variance_on_base_url(self):
+        req1 = evelink_api.APIRequest(self.api, 'foo/bar', {})
+        self.api.base_url = 'api.testeveonline.com'
+        req2 = evelink_api.APIRequest(self.api, 'foo/bar', {})
+
+        self.assertNotEqual(req1, req2)
+        self.assertNotEqual(str(req1), str(req2))
+
+    def test_str(self):
+        req = evelink_api.APIRequest(self.api, 'foo/bar', {'a': 1, 'b': 2})
+        self.assertEqual(
+            '1-%s' % hash(('foo/bar', (('a', '1'), ('b', '2')),)),
+            str(req)
+        )
+
+
+
 class APITestCase(unittest.TestCase):
 
     def setUp(self):
         self.cache = mock.MagicMock(spec=evelink_api.APICache)
         self.api = evelink_api.API(cache=self.cache)
+
         # force disable requests if enabled.
-        self._has_requests = evelink_api._has_requests
-        evelink_api._has_requests = False
+        self.api.Request = evelink_api.APIRequest
 
         self.test_xml = r"""
                 <?xml version='1.0' encoding='UTF-8'?>
@@ -59,35 +158,6 @@ class APITestCase(unittest.TestCase):
                     <cachedUntil>2009-11-18 19:05:31</cachedUntil>
                 </eveapi>
             """.strip()
-
-    def tearDown(self):
-        evelink_api._has_requests = self._has_requests
-
-    def test_cache_key(self):
-        assert self.api._cache_key('foo/bar', {})
-        assert self.api._cache_key('foo/bar', {'baz': 'qux'})
-
-        self.assertEqual(
-            self.api._cache_key('foo/bar', {'a':1, 'b':2}),
-            self.api._cache_key('foo/bar', {'b':2, 'a':1}),
-        )
-
-    def test_cache_key_variance(self):
-        """Make sure that things which shouldn't have the same cache key don't."""
-        self.assertNotEqual(
-            self.api._cache_key('foo/bar', {'a':1}),
-            self.api._cache_key('foo/bar', {'a':2}),
-        )
-
-        self.assertNotEqual(
-            self.api._cache_key('foo/bar', {'a':1}),
-            self.api._cache_key('foo/bar', {'b':1}),
-        )
-
-        self.assertNotEqual(
-            self.api._cache_key('foo/bar', {}),
-            self.api._cache_key('foo/baz', {}),
-        )
 
     @mock.patch('urllib2.urlopen')
     def test_get(self, mock_urlopen):
@@ -136,16 +206,15 @@ class APITestCase(unittest.TestCase):
         mock_urlopen.return_value = StringIO(self.test_xml)
         self.cache.get.return_value = None
 
-        api_key = (1, 'code')
-        api = evelink_api.API(cache=self.cache, api_key=api_key)
+        self.api.api_key = (1, 'code')
 
-        api.get('foo', {'a':[2,3,4]})
+        self.api.get('foo', {'a':[2,3,4]})
 
         # Make sure the api key id and verification code were passed
         self.assertEqual(mock_urlopen.mock_calls, [
                 mock.call(
                     'https://api.eveonline.com/foo.xml.aspx',
-                    'a=2%2C3%2C4&vCode=code&keyID=1',
+                    'a=2%2C3%2C4&keyID=1&vCode=code',
                 ),
             ])
 

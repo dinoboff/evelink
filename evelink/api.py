@@ -1,6 +1,7 @@
 import calendar
 import functools
 import logging
+from operator import itemgetter
 import re
 import time
 from urllib import urlencode
@@ -15,6 +16,7 @@ try:
 except ImportError:
     _log.info('`requests` not available, falling back to urllib2')
     _has_requests = None
+
 
 def _clean(v):
     """Convert parameters into an acceptable format for the API."""
@@ -132,6 +134,7 @@ class APICache(object):
     This very basic implementation simply stores values in
     memory, with no other persistence. You can subclass it
     to define a more complex/featureful/persistent cache.
+
     """
 
     def __init__(self):
@@ -141,7 +144,7 @@ class APICache(object):
         """Return the value referred to by 'key' if it is cached.
 
         key:
-            a result from the Python hash() function.
+            a hashable type.
         """
         result = self.cache.get(key)
         if not result:
@@ -156,18 +159,133 @@ class APICache(object):
         """Cache the provided value, referenced by 'key', for the given duration.
 
         key:
-            a result from the Python hash() function.
+            a hashable type.
         value:
-            an xml.etree.ElementTree.Element object
+            an api response as text (compatible with lxml).
         duration:
             a number of seconds before this cache entry should expire.
+
         """
         expiration = time.time() + duration
         self.cache[key] = (value, expiration)
 
 
+class APIRequest(tuple):
+    """
+    Immutable representation of an api request.
+
+    """
+
+    def __new__(cls, api, path, params=None):
+        params = params or {}
+
+        for key in params:
+            params[key] = _clean(params[key])
+
+        _log.debug("Calling %s with params=%r", path, params)
+
+        if api.api_key:
+            _log.debug("keyID and vCode added")
+            params['keyID'] = api.api_key[0]
+            params['vCode'] = api.api_key[1]
+
+        return tuple.__new__(
+            cls, 
+            (
+                api.CACHE_VERSION,
+                api.base_url,
+                path,
+                tuple(sorted(params.iteritems())),
+            )
+        )
+
+    cache_version = property(itemgetter(0))
+    base_url = property(itemgetter(1))
+    path = property(itemgetter(2))
+    params = property(itemgetter(3))
+
+
+    @property
+    def encoded_params(self):
+        return urlencode(self.params)
+
+    @property
+    def absolute_url(self):
+        return "https://%s/%s.xml.aspx" % (self.base_url, self.path)
+
+    def send(self, api):
+        """
+        Send the request and return the body as a string.
+
+        Raise an exception for a failed request (including 4xx and 5xx 
+        response error code).
+        
+        TODO: handle failed request better. The API wrapper needs to know 
+        if the error was due to the network, to a bad key, to a bad request or  
+        or to the API server.
+
+        """
+        try:
+            if self.params:
+                # POST request
+                _log.debug("POSTing request")
+                r = urllib2.urlopen(self.absolute_url, self.encoded_params)
+            else:
+                # GET request
+                _log.debug("GETting request")
+                r = urllib2.urlopen(self.absolute_url)
+
+            result = r.read()
+            r.close()
+            return result
+        except urllib2.URLError as e:
+            # TODO: Handle this better?
+            raise e
+
+    def __str__(self):
+        """
+        Current cache key implementation.
+        
+        TODO: include base_url?
+
+        """
+        return '%s-%s' % (self.cache_version, hash(self[2:4]),)
+
+
+class APIRequestRequests(APIRequest):
+    
+    def send(self, api):
+        _log.debug("sending request using requests")
+        if api.session is None:
+            api.session = requests.Session()
+
+        try:
+            if self.params:
+                # POST request
+                _log.debug("POSTing request")
+                r = api.session.post(
+                    self.absolute_url, 
+                    params=self.encoded_params
+                )
+            else:
+                # GET request
+                _log.debug("GETting request")
+                r = api.session.get(self.absolute_url)
+            return r.content
+        except requests.exceptions.RequestException as e:
+            # TODO: Handle this better?
+            raise e
+
+
 class API(object):
     """A wrapper around the EVE API."""
+
+    CACHE_VERSION = 1
+
+    if _has_requests:
+        Request = APIRequestRequests
+    else:
+        Request = APIRequest
 
     def __init__(self, base_url="api.eveonline.com", cache=None, api_key=None):
         self.base_url = base_url
@@ -176,12 +294,12 @@ class API(object):
         if not isinstance(cache, APICache):
             raise ValueError("The provided cache must subclass from APICache.")
         self.cache = cache
-        self.CACHE_VERSION = '1'
 
         if api_key and len(api_key) != 2:
             raise ValueError("The provided API key must be a tuple of (keyID, vCode).")
         self.api_key = api_key
         self._set_last_timestamps()
+        self.session = None
 
     def _set_last_timestamps(self, current_time=0, cached_until=0):
         self.last_timestamps = {
@@ -189,37 +307,24 @@ class API(object):
             'cached_until': cached_until,
         }
 
-    def _cache_key(self, path, params):
-        sorted_params = sorted(params.iteritems())
-        # Paradoxically, Shelve doesn't like integer keys.
-        return '%s-%s' % (self.CACHE_VERSION, hash((path, tuple(sorted_params))))
-
     def get(self, path, params=None):
         """Request a specific path from the EVE API.
 
         The supplied path should be a slash-separated path
         frament, e.g. "corp/AssetList". (Basically, the portion
         of the API url in between the root / and the .xml bit.)
+
         """
 
-        params = params or {}
-        params = dict((k, _clean(v)) for k,v in params.iteritems())
-
-        _log.debug("Calling %s with params=%r", path, params)
-        if self.api_key:
-            _log.debug("keyID and vCode added")
-            params['keyID'] = self.api_key[0]
-            params['vCode'] = self.api_key[1]
-
-        key = self._cache_key(path, params)
+        req = self.Request(self, path, params)
+        # TODO: simply use the request as key.
+        key = str(req)
         response = self.cache.get(key)
         cached = response is not None
 
         if not cached:
             # no cached response body found, call the API for one.
-            params = urlencode(params)
-            full_path = "https://%s/%s.xml.aspx" % (self.base_url, path)
-            response = self.send_request(full_path, params)
+            response = req.send(self)
         else:
             _log.debug("Cache hit, returning cached payload")
 
@@ -244,48 +349,6 @@ class API(object):
         result = tree.find('result')
         return result
 
-    def send_request(self, full_path, params):
-        if _has_requests:
-            return self.requests_request(full_path, params)
-        else:
-            return self.urllib2_request(full_path, params)
-
-    def urllib2_request(self, full_path, params):
-        try:
-            if params:
-                # POST request
-                _log.debug("POSTing request")
-                r = urllib2.urlopen(full_path, params)
-            else:
-                # GET request
-                _log.debug("GETting request")
-                r = urllib2.urlopen(full_path)
-            result = r.read()
-            r.close()
-            return result
-        except urllib2.URLError as e:
-            # TODO: Handle this better?
-            raise e
-
-    def requests_request(self, full_path, params):
-        session = getattr(self, 'session', None)
-        if not session:
-            session = requests.Session()
-            self.session = session
-
-        try:
-            if params:
-                # POST request
-                _log.debug("POSTing request")
-                r = session.post(full_path, params=params)
-            else:
-                # GET request
-                _log.debug("GETting request")
-                r = session.get(full_path)
-            return r.content
-        except requests.exceptions.RequestException as e:
-            # TODO: Handle this better?
-            raise e
 
 def auto_api(func):
     """A decorator to automatically provide an API instance.

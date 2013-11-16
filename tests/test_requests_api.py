@@ -1,4 +1,3 @@
-from StringIO import StringIO
 import unittest2 as unittest
 
 import mock
@@ -17,6 +16,9 @@ class RequestsAPITestCase(unittest.TestCase):
     def setUp(self):
         self.cache = mock.MagicMock(spec=evelink_api.APICache)
         self.api = evelink_api.API(cache=self.cache)
+
+        # force enable requests
+        self.api.Request = evelink_api.APIRequestRequests
 
         self.test_xml = r"""
                 <?xml version='1.0' encoding='UTF-8'?>
@@ -94,16 +96,15 @@ class RequestsAPITestCase(unittest.TestCase):
         self.mock_sessions.post.return_value = DummyResponse(self.test_xml)
         self.cache.get.return_value = None
 
-        api_key = (1, 'code')
-        api = evelink_api.API(cache=self.cache, api_key=api_key)
+        self.api.api_key = (1, 'code')
 
-        api.get('foo', {'a':[2,3,4]})
+        self.api.get('foo', {'a':[2,3,4]})
 
         # Make sure the api key id and verification code were passed
         self.assertEqual(self.mock_sessions.post.mock_calls, [
                 mock.call(
                     'https://api.eveonline.com/foo.xml.aspx',
-                    params='a=2%2C3%2C4&vCode=code&keyID=1',
+                    params='a=2%2C3%2C4&keyID=1&vCode=code',
                 ),
             ])
 
