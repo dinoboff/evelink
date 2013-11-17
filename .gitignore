@@ -1,6 +1,8 @@
 dist
 build
-venv
+venv*
 MANIFEST
 *.py[co]
 .*.swp
+vendors
+google_appengine_*.zip
