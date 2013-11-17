@@ -7,7 +7,4 @@ before_script:
   - mkdir -p vendors
   - wget http://googleappengine.googlecode.com/files/google_appengine_1.8.7.zip -nv
   - unzip -qd vendors google_appengine_1.8.7.zip
-script: runtests.py
-notifications:
-  email:
-    - d-eve-lopment@googlegroups.com
+script: ./runtests.py
