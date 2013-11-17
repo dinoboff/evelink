@@ -11,8 +11,8 @@ else:
     NOGAE = False
 
 
-@unittest.skipIf(NOGAE, 'No GAE SDK found')
 @unittest.skipIf(sys.version_info < (2, 7,), 'GAE requires python 2.7')
+@unittest.skipIf(NOGAE, 'No GAE SDK found')
 class GAETestCase(unittest.TestCase):
     """
     Those test cases require python 2.6 and the Google App Engine SDK 
