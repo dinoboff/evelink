@@ -315,7 +315,6 @@ class API(object):
         of the API url in between the root / and the .xml bit.)
 
         """
-
         req = self.Request(self, path, params)
         # TODO: simply use the request as key.
         key = str(req)
@@ -323,20 +322,26 @@ class API(object):
         cached = response is not None
 
         if not cached:
-            # no cached response body found, call the API for one.
             response = req.send(self)
         else:
             _log.debug("Cache hit, returning cached payload")
 
+        result, current_time, expires_time = self.process_response(response)
+
+        if not cached:
+            self.cache.put(key, response, expires_time - current_time)
+
+        return result
+
+    def process_response(self, response):
+        """return the result (Element object), currentTime and cacheUntil 
+        elements from an api call response.
+
+        """
         tree = ElementTree.fromstring(response)
         current_time = get_ts_value(tree, 'currentTime')
         expires_time = get_ts_value(tree, 'cachedUntil')
         self._set_last_timestamps(current_time, expires_time)
-
-        if not cached:
-            # Have to split this up from above as timestamps have to be
-            # extracted.
-            self.cache.put(key, response, expires_time - current_time)
 
         error = tree.find('error')
         if error is not None:
@@ -346,8 +351,7 @@ class API(object):
             _log.error("Raising API error: %r" % exc)
             raise exc
 
-        result = tree.find('result')
-        return result
+        return tree.find('result'), current_time, expires_time
 
 
 def auto_api(func):
