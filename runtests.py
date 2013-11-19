@@ -21,7 +21,9 @@ def setup_gae(sdk_path):
 def main(sdk_path, test_path):
     setup_gae(sdk_path)
     suite = unittest2.loader.TestLoader().discover(test_path)
-    unittest2.TextTestRunner(verbosity=2, buffer=True).run(suite)
+    return unittest2.TextTestRunner(verbosity=2, buffer=True).run(suite)
 
 if __name__ == '__main__':
-    main(GAE_SDK_PATH, TEST_PATH)
+    results = main(GAE_SDK_PATH, TEST_PATH)
+    if not results.wasSuccessful():
+    	sys.exit(1)
