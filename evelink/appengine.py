@@ -20,6 +20,21 @@ class AppEngineAPIRequest(api.APIRequest):
             raise ValueError("Bad result from server: {}".format(result.status_code))
         return result.content
 
+    @ndb.tasklet
+    def send_async(self, api):
+        ctx = ndb.get_context()
+        result = yield ctx.urlfetch(
+            url=self.absolute_url,
+            payload=self.encoded_params,
+            method=urlfetch.POST if self.params else urlfetch.GET,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'}
+                    if self.params else {}
+        )
+
+        if result.status_code != 200:
+            raise ValueError("Bad result from server: {}".format(result.status_code))
+        raise ndb.Return(result.content)
+
 
 class AppEngineAPI(api.API):
     """
@@ -32,6 +47,25 @@ class AppEngineAPI(api.API):
         cache = cache or AppEngineCache()
         super(AppEngineAPI, self).__init__(base_url=base_url,
                 cache=cache, api_key=api_key)
+
+    @ndb.tasklet
+    def get_async(self, path, params):
+        req = self.Request(self, path, params)
+        key = str(req)
+        # TODO: add async method
+        response = self.cache.get(key)
+        cached = response is not None
+
+        if not cached:
+            response = yield req.send_async(self)
+
+        result, current_time, expires_time = self.process_response(response)
+
+        if not cached:
+            # TODO: add async method
+            self.cache.put(key, response, expires_time - current_time)
+
+        raise ndb.Return(result)
 
 
 class AppEngineCache(api.APICache):
