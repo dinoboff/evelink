@@ -1,4 +1,5 @@
 import calendar
+import collections
 import functools
 import logging
 from operator import itemgetter
@@ -118,12 +119,15 @@ def parse_ms_date(date_string):
 class APIError(Exception):
     """Exception raised when the EVE API returns an error."""
 
-    def __init__(self, code=None, message=None):
+    def __init__(self, code=None, message=None, timestamp=None, expires=None):
         self.code = code
         self.message = message
+        self.timestamp = timestamp
+        self.expires = expires
 
     def __repr__(self):
-        return "APIError(%r, %r)" % (self.code, self.message)
+        return "APIError(%r, %r, timestamp=%r, expires=%r)" % (
+            self.code, self.message, self.timestamp, self.expires)
 
     def __str__(self):
         return "%s (code=%d)" % (self.message, int(self.code))
@@ -168,6 +172,27 @@ class APICache(object):
         """
         expiration = time.time() + duration
         self.cache[key] = (value, expiration)
+
+
+APIResult = collections.namedtuple("APIResult", [
+        "result",
+        "timestamp",
+        "expires",
+    ])
+
+
+class APIResult(tuple):
+    
+    result = property(itemgetter(0))
+    timestamp = property(itemgetter(1))
+    expires = property(itemgetter(2))
+
+    def __new__(cls, result, timestamp, expires):
+        return tuple.__new__(cls, (result, timestamp, expires,))
+
+
+    def cache_for(self):
+        return self.expires - self.timestamp
 
 
 class APIRequest(tuple):
@@ -326,12 +351,12 @@ class API(object):
         else:
             _log.debug("Cache hit, returning cached payload")
 
-        result, current_time, expires_time = self.process_response(response)
+        results = self.process_response(response)
 
         if not cached:
-            self.cache.put(key, response, expires_time - current_time)
+            self.cache.put(key, response, results.cache_for())
 
-        return result
+        return results
 
     def process_response(self, response):
         """return the result (Element object), currentTime and cacheUntil 
@@ -347,11 +372,12 @@ class API(object):
         if error is not None:
             code = error.attrib['code']
             message = error.text.strip()
-            exc = APIError(code, message)
+            exc = APIError(code, message, current_time, expires_time)
             _log.error("Raising API error: %r" % exc)
             raise exc
 
-        return tree.find('result'), current_time, expires_time
+        result = tree.find('result')
+        return APIResult(result, current_time, expires_time)
 
 
 def auto_api(func):

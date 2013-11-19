@@ -102,7 +102,7 @@ class AppEngineAPITestCase(GAETestCase):
         mock_urlfetch.return_value.content = self.test_xml
 
         api = appengine.AppEngineAPI()
-        result = api.get('foo/Bar', {'a':[1,2,3]})
+        result = api.get('foo/Bar', {'a':[1,2,3]}).result
 
         rowset = result.find('rowset')
         rows = rowset.findall('row')
@@ -181,7 +181,7 @@ class AppEngineTaskletTestCase(GAETestCase):
             result = client.character_info_from_id(
                 char.char_id,
                 api_result=api_result
-            )
+            ).result
             
             if result:
                 char.corp_name = result['corp']['name']

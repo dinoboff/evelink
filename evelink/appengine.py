@@ -59,13 +59,12 @@ class AppEngineAPI(api.API):
         if not cached:
             response = yield req.send_async(self)
 
-        result, current_time, expires_time = self.process_response(response)
+        results = self.process_response(response)
 
         if not cached:
-            # TODO: add async method
-            self.cache.put(key, response, expires_time - current_time)
+            self.cache.put(key, response, results.cache_for())
 
-        raise ndb.Return(result)
+        raise ndb.Return(results)
 
 
 class AppEngineCache(api.APICache):

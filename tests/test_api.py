@@ -168,6 +168,9 @@ class APITestCase(unittest.TestCase):
 
         result = self.api.get('foo/Bar', {'a':[1,2,3]})
 
+        self.assertEqual(len(result), 3)
+        result, current, expiry = result
+
         rowset = result.find('rowset')
         rows = rowset.findall('row')
         self.assertEqual(len(rows), 2)
@@ -176,6 +179,8 @@ class APITestCase(unittest.TestCase):
             'current_time': 1255885531,
             'cached_until': 1258563931,
         })
+        self.assertEqual(current, 1255885531)
+        self.assertEqual(expiry, 1258563931)
 
     @mock.patch('urllib2.urlopen')
     def test_cached_get(self, mock_urlopen):
@@ -190,6 +195,9 @@ class APITestCase(unittest.TestCase):
         # Ensure this is really not called.
         self.assertFalse(mock_urlopen.called)
 
+        self.assertEqual(len(result), 3)
+        result, current, expiry = result
+
         rowset = result.find('rowset')
         rows = rowset.findall('row')
         self.assertEqual(len(rows), 2)
@@ -200,6 +208,8 @@ class APITestCase(unittest.TestCase):
             'current_time': 1255885531,
             'cached_until': 1258563931,
         })
+        self.assertEqual(current, 1255885531)
+        self.assertEqual(expiry, 1258563931)
 
     @mock.patch('urllib2.urlopen')
     def test_get_with_apikey(self, mock_urlopen):
