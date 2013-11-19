@@ -1,5 +1,4 @@
 import calendar
-import collections
 import functools
 import logging
 from operator import itemgetter
@@ -132,6 +131,54 @@ class APIError(Exception):
     def __str__(self):
         return "%s (code=%d)" % (self.message, int(self.code))
 
+
+class CacheContext(object):
+    """A context Manager wich will try to update the cache value for a key
+    if the context leaves with and APIError exception raise or none raised.
+
+    For the cache entry to be updated, the value property needs to change and 
+    the duration property needs to be set.
+    
+    """
+
+    def __init__(self, cache, key):
+        self.cache = cache
+        self.key = key
+        self.value = cache.get(key)
+        self._old_value = self.value
+        self.duration = None
+
+    def sync(self):
+        if self.value == self._old_value:
+            return
+
+        if self.duration is None:
+            return
+
+        self.cache.put(self.key, self.value, self.duration)
+        self._old_value = self.value
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """If the context exit on an APIError, tries to update the cache value
+
+        """
+        if exc_type is None:
+            self.sync()
+            return
+
+        if exc_type is not APIError:
+            return
+
+        if exc_value.expires is None or exc_value.timestamp is None:
+            return
+
+        self.duration = exc_value.expires - exc_value.timestamp
+        self.sync()
+
+
 class APICache(object):
     """Minimal interface for caching API requests.
 
@@ -143,6 +190,9 @@ class APICache(object):
 
     def __init__(self):
         self.cache = {}
+
+    def cache_for(self, key):
+        return CacheContext(self, key)
 
     def get(self, key):
         """Return the value referred to by 'key' if it is cached.
@@ -172,13 +222,6 @@ class APICache(object):
         """
         expiration = time.time() + duration
         self.cache[key] = (value, expiration)
-
-
-APIResult = collections.namedtuple("APIResult", [
-        "result",
-        "timestamp",
-        "expires",
-    ])
 
 
 class APIResult(tuple):
@@ -341,20 +384,14 @@ class API(object):
 
         """
         req = self.Request(self, path, params)
-        # TODO: simply use the request as key.
-        key = str(req)
-        response = self.cache.get(key)
-        cached = response is not None
-
-        if not cached:
-            response = req.send(self)
-        else:
-            _log.debug("Cache hit, returning cached payload")
-
-        results = self.process_response(response)
-
-        if not cached:
-            self.cache.put(key, response, results.cache_for())
+        with self.cache.cache_for(str(req)) as cache:
+            if cache.value is None:
+                cache.value = req.send(self)
+            else:
+                _log.debug("Cache hit, returning cached payload")
+            
+            results = self.process_response(cache.value)
+            cache.duration = results.cache_for()
 
         return results
 
@@ -368,7 +405,8 @@ class API(object):
         expires_time = get_ts_value(tree, 'cachedUntil')
         self._set_last_timestamps(current_time, expires_time)
 
-        error = tree.find('error')
+        # TODO: use the http response code instead of looking for the element
+        error = tree.find('error') 
         if error is not None:
             code = error.attrib['code']
             message = error.text.strip()

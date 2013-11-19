@@ -50,19 +50,29 @@ class AppEngineAPI(api.API):
 
     @ndb.tasklet
     def get_async(self, path, params):
+        # req = self.Request(self, path, params)
+        # key = str(req)
+        # # TODO: add async method
+        # response = self.cache.get(key)
+        # cached = response is not None
+
+        # if not cached:
+        #     response = yield req.send_async(self)
+
+        # results = self.process_response(response)
+
+        # if not cached:
+        #     self.cache.put(key, response, results.cache_for())
+
+        # raise ndb.Return(results)
         req = self.Request(self, path, params)
-        key = str(req)
-        # TODO: add async method
-        response = self.cache.get(key)
-        cached = response is not None
-
-        if not cached:
-            response = yield req.send_async(self)
-
-        results = self.process_response(response)
-
-        if not cached:
-            self.cache.put(key, response, results.cache_for())
+        # TODO: replace by async method
+        with self.cache.cache_for(str(req)) as cache:
+            if cache.value is None:
+                cache.value = yield req.send_async(self)
+            
+            results = self.process_response(cache.value)
+            cache.duration = results.cache_for()
 
         raise ndb.Return(results)
 
