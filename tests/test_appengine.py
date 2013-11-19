@@ -28,6 +28,7 @@ class DatastoreCacheTestCase(GAETestCase):
     def setUp(self):
         self.testbed = testbed.Testbed()
         self.testbed.activate()
+        self.testbed.init_memcache_stub()
         self.testbed.init_datastore_v3_stub()
 
     def tearDown(self):
