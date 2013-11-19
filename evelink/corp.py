@@ -19,7 +19,7 @@ class Corp(object):
     def __init__(self, api):
         self.api = api
 
-    def corporation_sheet(self, corp_id=None):
+    def corporation_sheet(self, corp_id=None, api_result=None):
         """Get information about a corporation.
 
         NOTE: This method may be called with or without specifying
@@ -29,11 +29,12 @@ class Corp(object):
         a corp api key *must* be provided, and the private information
         for that corporation will be returned along with the public info.
         """
-        params = {}
-        if corp_id is not None:
-            params['corporationID'] = corp_id
+        if api_result is None:
+            params = {}
+            if corp_id is not None:
+                params['corporationID'] = corp_id
 
-        api_result = self.api.get("corp/CorporationSheet", params)
+            api_result = self.api.get("corp/CorporationSheet", params)
 
         def get_logo_details(logo_result):
             _str, _int, _float, _bool, _ts = api.elem_getters(logo_result)
@@ -94,20 +95,23 @@ class Corp(object):
 
         return result
 
-    def industry_jobs(self):
+    def industry_jobs(self, api_result=None):
         """Get a list of jobs for a corporation."""
 
-        api_result = self.api.get('corp/IndustryJobs')
+        if api_result is None:
+            api_result = self.api.get('corp/IndustryJobs')
 
         return parse_industry_jobs(api_result)
 
-    def npc_standings(self):
+    def npc_standings(self, api_result=None):
         """Returns information about the corporation's standings towards NPCs.
 
         NOTE: This is *only* NPC standings. Player standings are accessed
         via the 'contacts' method.
         """
-        api_result = self.api.get('corp/Standings')
+        if api_result is None:
+            api_result = self.api.get('corp/Standings')
+
         container = api_result.find('corporationNPCStandings')
 
         rowsets = dict((r.attrib['name'], r) for r in container.findall('rowset'))
@@ -135,24 +139,27 @@ class Corp(object):
 
         return results
 
-    def kills(self, before_kill=None):
+    def kills(self, before_kill=None, api_result=None):
         """Look up recent kills for a corporation.
 
         before_kill:
             Optional. Only show kills before this kill id. (Used for paging.)
         """
 
-        params = {}
-        if before_kill is not None:
-            params['beforeKillID'] = before_kill
-        api_result = self.api.get('corp/KillLog', params)
+        if api_result is None:
+            params = {}
+            if before_kill is not None:
+                params['beforeKillID'] = before_kill
+
+            api_result = self.api.get('corp/KillLog', params)
 
         return parse_kills(api_result)
 
-    def wallet_info(self):
+    def wallet_info(self, api_result=None):
         """Get information about corp wallets."""
 
-        api_result = self.api.get('corp/AccountBalance')
+        if api_result is None:
+            api_result = self.api.get('corp/AccountBalance')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -166,37 +173,42 @@ class Corp(object):
 
         return results
 
-    def wallet_journal(self, before_id=None, limit=None):
+    def wallet_journal(self, before_id=None, limit=None, api_result=None):
         """Returns wallet journal for a corporation."""
 
-        params = {}
-        if before_id is not None:
-            params['fromID'] = before_id
-        if limit is not None:
-            params['rowCount'] = limit
-        api_result = self.api.get('corp/WalletJournal', params)
+        if api_result is None:
+            params = {}
+            if before_id is not None:
+                params['fromID'] = before_id
+            if limit is not None:
+                params['rowCount'] = limit
+            
+            api_result = self.api.get('corp/WalletJournal', params)
 
         return parse_wallet_journal(api_result)
 
-    def wallet_transactions(self, before_id=None, limit=None):
+    def wallet_transactions(self, before_id=None, limit=None, api_result=None):
         """Returns wallet transactions for a corporation."""
 
-        params = {}
-        if before_id is not None:
-            params['fromID'] = before_id
-        if limit is not None:
-            params['rowCount'] = limit
-        api_result = self.api.get('corp/WalletTransactions', params)
+        if api_result is None:
+            params = {}
+            if before_id is not None:
+                params['fromID'] = before_id
+            if limit is not None:
+                params['rowCount'] = limit
+            
+            api_result = self.api.get('corp/WalletTransactions', params)
 
         return parse_wallet_transactions(api_result)
 
-    def orders(self):
+    def orders(self, api_result=None):
         """Return a corporation's buy and sell orders."""
-        api_result = self.api.get('corp/MarketOrders')
+        if api_result is None:
+            api_result = self.api.get('corp/MarketOrders')
 
         return parse_market_orders(api_result)
 
-    def assets(self):
+    def assets(self, api_result=None):
         """Get information about corp assets.
 
         Each item is a dict, with keys 'id', 'item_type_id',
@@ -218,16 +230,18 @@ class Corp(object):
         the top-level values as "containers" with no fields except for
         "contents" and "location_id".
         """
-        api_result = self.api.get('corp/AssetList')
+        if api_result is None:
+            api_result = self.api.get('corp/AssetList')
         return parse_assets(api_result)
 
-    def faction_warfare_stats(self):
+    def faction_warfare_stats(self, api_result=None):
         """Returns stats from faction warfare if this corp is enrolled.
 
         NOTE: This will raise an APIError if the corp is not enrolled in
         Faction Warfare.
         """
-        api_result = self.api.get('corp/FacWarStats')
+        if api_result is None:
+            api_result = self.api.get('corp/FacWarStats')
 
         _str, _int, _float, _bool, _ts = api.elem_getters(api_result)
 
@@ -250,27 +264,31 @@ class Corp(object):
             },
         }
 
-    def contract_bids(self):
+    def contract_bids(self, api_result=None):
         """Lists the latest bids that have been made to any recent auctions."""
-        api_result = self.api.get('corp/ContractBids')
+        if api_result is None:
+            api_result = self.api.get('corp/ContractBids')
 
         return parse_contract_bids(api_result)
 
-    def contract_items(self, contract_id):
+    def contract_items(self, contract_id, api_result=None):
         """Lists items that a specified contract contains"""
-        api_result = self.api.get('corp/ContractItems',
+        if api_result is None:
+            api_result = self.api.get('corp/ContractItems',
             {'contractID': contract_id})
 
         return parse_contract_items(api_result)
 
-    def contracts(self):
+    def contracts(self, api_result=None):
         """Get information about corp contracts."""
-        api_result = self.api.get('corp/Contracts')
+        if api_result is None:
+            api_result = self.api.get('corp/Contracts')
         return parse_contracts(api_result)
 
-    def shareholders(self):
+    def shareholders(self, api_result=None):
         """Get information about a corp's shareholders."""
-        api_result = self.api.get('corp/Shareholders')
+        if api_result is None:
+            api_result = self.api.get('corp/Shareholders')
 
         results = {
             'char': {},
@@ -302,14 +320,16 @@ class Corp(object):
 
         return results
 
-    def contacts(self):
+    def contacts(self, api_result=None):
         """Return the corp's corp and alliance contact lists."""
-        api_result = self.api.get('corp/ContactList')
+        if api_result is None:
+            api_result = self.api.get('corp/ContactList')
         return parse_contact_list(api_result)
 
-    def titles(self):
+    def titles(self, api_result=None):
         """Returns information about the corporation's titles."""
-        api_result = self.api.get('corp/Titles')
+        if api_result is None:
+            api_result = self.api.get('corp/Titles')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -347,9 +367,10 @@ class Corp(object):
 
         return results
 
-    def starbases(self):
+    def starbases(self, api_result=None):
         """Returns information about the corporation's POSes."""
-        api_result = self.api.get('corp/StarbaseList')
+        if api_result is None:
+            api_result = self.api.get('corp/StarbaseList')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -369,9 +390,10 @@ class Corp(object):
 
         return results
 
-    def starbase_details(self, starbase_id):
+    def starbase_details(self, starbase_id, api_result=None):
         """Returns details about the specified POS."""
-        api_result = self.api.get('corp/StarbaseDetail', {'itemID': starbase_id})
+        if api_result is None:
+            api_result = self.api.get('corp/StarbaseDetail', {'itemID': starbase_id})
 
         _str, _int, _float, _bool, _ts = api.elem_getters(api_result)
 
@@ -458,12 +480,15 @@ class Corp(object):
 
         return result
 
-    def members(self, extended=True):
+    def members(self, extended=True, api_result=None):
         """Returns details about each member of the corporation."""
-        args = {}
-        if extended:
-            args['extended'] = 1
-        api_result = self.api.get('corp/MemberTracking', args)
+        
+        if api_result is None:
+            args = {}
+            if extended:
+                args['extended'] = 1
+            
+            api_result = self.api.get('corp/MemberTracking', args)
 
         rowset = api_result.find('rowset')
         results = {}
@@ -504,9 +529,10 @@ class Corp(object):
 
         return results
 
-    def permissions(self):
+    def permissions(self, api_result=None):
         """Returns information about corporation member permissions."""
-        api_result = self.api.get('corp/MemberSecurity')
+        if api_result is None:
+            api_result = self.api.get('corp/MemberSecurity')
 
         results = {}
         rowset = api_result.find('rowset')
@@ -542,9 +568,10 @@ class Corp(object):
 
         return results
 
-    def permissions_log(self):
+    def permissions_log(self, api_result=None):
         """Returns information about changes to member permissions."""
-        api_result = self.api.get('corp/MemberSecurityLog')
+        if api_result is None:
+            api_result = self.api.get('corp/MemberSecurityLog')
 
         inverse_role_types = dict((v,k) for k,v in constants.Corp.role_types.iteritems())
 
@@ -585,9 +612,10 @@ class Corp(object):
         results.sort(key=lambda r: r['timestamp'], reverse=True)
         return results
 
-    def stations(self):
+    def stations(self, api_result=None):
         """Returns information about the corporation's (non-POS) stations."""
-        api_result = self.api.get('corp/OutpostList')
+        if api_result is None:
+            api_result = self.api.get('corp/OutpostList')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -611,9 +639,10 @@ class Corp(object):
 
         return results
 
-    def station_services(self, station_id):
+    def station_services(self, station_id, api_result=None):
         """Returns information about a given station's services."""
-        api_result = self.api.get('corp/OutpostServiceDetail', {'itemID': station_id})
+        if api_result is None:
+            api_result = self.api.get('corp/OutpostServiceDetail', {'itemID': station_id})
 
         rowset = api_result.find('rowset')
         results = {}
@@ -632,9 +661,10 @@ class Corp(object):
 
         return results
 
-    def medals(self):
+    def medals(self, api_result=None):
         """Returns information about the medals created by a corporation."""
-        api_result = self.api.get('corp/Medals')
+        if api_result is None:
+            api_result = self.api.get('corp/Medals')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -651,9 +681,10 @@ class Corp(object):
 
         return results
 
-    def member_medals(self):
+    def member_medals(self, api_result=None):
         """Returns information about medals assigned to corporation members."""
-        api_result = self.api.get("corp/MemberMedals")
+        if api_result is None:
+            api_result = self.api.get("corp/MemberMedals")
 
         rowset = api_result.find('rowset')
         results = {}
@@ -671,9 +702,10 @@ class Corp(object):
 
         return results
 
-    def container_log(self):
+    def container_log(self, api_result=None):
         """Returns a log of actions performed on corporation containers."""
-        api_result = self.api.get("corp/ContainerLog")
+        if api_result is None:
+            api_result = self.api.get("corp/ContainerLog")
 
         results = []
         rowset = api_result.find('rowset')
@@ -711,11 +743,13 @@ class Corp(object):
 
         return results
 
-    def locations(self, location_list):
-        params={
-            'IDs' : location_list,
-        }
-        api_result = self.api.get('corp/Locations', params)
+    def locations(self, location_list, api_result=None):
+        if api_result is None:
+            params={
+                'IDs' : location_list,
+            }
+        
+            api_result = self.api.get('corp/Locations', params)
         
         rowset = api_result.find('rowset')
         rows = rowset.findall('row')

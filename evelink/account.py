@@ -10,9 +10,10 @@ class Account(object):
     def __init__(self, api):
         self.api = api
 
-    def status(self):
+    def status(self, api_result=None):
         """Returns the account's subscription status."""
-        api_result = self.api.get('account/AccountStatus')
+        if api_result is None:
+            api_result = self.api.get('account/AccountStatus')
 
         _str, _int, _float, _bool, _ts = api.elem_getters(api_result)
 
@@ -23,10 +24,11 @@ class Account(object):
             'minutes_played': _int('logonMinutes'),
         }
 
-    def key_info(self):
+    def key_info(self, api_result=None):
         """Returns the details of the API key being used to auth."""
 
-        api_result = self.api.get('account/APIKeyInfo')
+        if api_result is None:
+            api_result = self.api.get('account/APIKeyInfo')
 
         key = api_result.find('key')
         result = {
@@ -50,10 +52,11 @@ class Account(object):
 
         return result
 
-    def characters(self):
+    def characters(self, api_result=None):
         """Returns all of the characters on an account."""
 
-        api_result = self.api.get('account/Characters')
+        if api_result is None:
+            api_result = self.api.get('account/Characters')
 
         rowset = api_result.find('rowset')
         result = {}

@@ -7,7 +7,7 @@ class Map(object):
     def __init__(self, api=None):
         self.api = api
 
-    def jumps_by_system(self):
+    def jumps_by_system(self, api_result=None):
         """Get jump counts for systems in the last hour.
 
         Returns a tuple of ({system:jumps...}, timestamp).
@@ -15,7 +15,8 @@ class Map(object):
         NOTE: Systems with 0 jumps in the last hour are not included!
         """
 
-        api_result = self.api.get('map/Jumps')
+        if api_result is None:
+            api_result = self.api.get('map/Jumps')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -28,7 +29,7 @@ class Map(object):
 
         return results, data_time
 
-    def kills_by_system(self):
+    def kills_by_system(self, api_result=None):
         """Get kill counts for systems in the last hour.
 
         Returns a tuple of ({system:{killdata}, timestamp).
@@ -36,7 +37,8 @@ class Map(object):
         Each {killdata} is {'faction':count, 'ship':count, 'pod':count}.
         """
 
-        api_result = self.api.get('map/Kills')
+        if api_result is None:
+            api_result = self.api.get('map/Kills')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -57,10 +59,11 @@ class Map(object):
 
         return results, data_time
 
-    def faction_warfare_systems(self):
+    def faction_warfare_systems(self, api_result=None):
         """Get a dict of factional warfare systems and their info."""
 
-        api_result = self.api.get('map/FacWarSystems')
+        if api_result is None:
+            api_result = self.api.get('map/FacWarSystems')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -83,10 +86,11 @@ class Map(object):
 
         return results
 
-    def sov_by_system(self):
+    def sov_by_system(self, api_result=None):
         """Get sovereignty info keyed by system."""
 
-        api_result = self.api.get('map/Sovereignty')
+        if api_result is None:
+            api_result = self.api.get('map/Sovereignty')
 
         rowset = api_result.find('rowset')
         results = {}

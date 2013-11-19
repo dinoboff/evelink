@@ -7,9 +7,10 @@ class EVE(object):
     def __init__(self, api=None):
         self.api = api
 
-    def certificate_tree(self):
+    def certificate_tree(self, api_result=None):
         """Returns a list of certificates in eve."""
-        api_result = self.api.get('eve/CertificateTree')
+        if api_result is None:
+            api_result = self.api.get('eve/CertificateTree')
 
         result = {}
         rowset = api_result.find('rowset')
@@ -74,7 +75,7 @@ class EVE(object):
 
         return result
 
-    def character_names_from_ids(self, id_list):
+    def character_names_from_ids(self, id_list, api_result=None):
         """Retrieve a dict mapping character IDs to names.
 
         id_list:
@@ -85,7 +86,8 @@ class EVE(object):
         the entire call to fail.
         """
 
-        api_result = self.api.get('eve/CharacterName', {
+        if api_result is None:
+            api_result = self.api.get('eve/CharacterName', {
                 'IDs': set(id_list),
             })
 
@@ -105,14 +107,17 @@ class EVE(object):
 
         return results
 
-    def character_name_from_id(self, char_id):
+    def character_name_from_id(self, char_id, api_result=None):
         """Retrieve the character's name based on ID.
 
         Convenience wrapper around character_names_from_ids().
         """
-        return self.character_names_from_ids([char_id]).get(char_id)
+        return self.character_names_from_ids(
+            [char_id],
+            api_result=api_result
+        ).get(char_id)
 
-    def character_ids_from_names(self, name_list):
+    def character_ids_from_names(self, name_list, api_result=None):
         """Retrieve a dict mapping character names to IDs.
 
         name_list:
@@ -121,7 +126,8 @@ class EVE(object):
         Names of unknown characters will map to None.
         """
 
-        api_result = self.api.get('eve/CharacterID', {
+        if api_result is None:
+            api_result = self.api.get('eve/CharacterID', {
                 'names': set(name_list),
             })
 
@@ -136,23 +142,27 @@ class EVE(object):
 
         return results
 
-    def character_id_from_name(self, name):
+    def character_id_from_name(self, name, api_result=None):
         """Retrieve the named character's ID.
 
         Convenience wrapper around character_ids_from_names().
         """
-        return self.character_ids_from_names([name]).get(name)
+        return self.character_ids_from_names(
+            [name],
+            api_result=api_result
+        ).get(name)
 
-    def character_info_from_id(self, char_id):
+    def character_info_from_id(self, char_id, api_result=None):
         """Retrieve a dict of info about the designated character."""
 
-        api_result = self.api.get('eve/CharacterInfo', {
+        if api_result is None:
+            api_result = self.api.get('eve/CharacterInfo', {
                 'characterID': char_id,
             })
 
         if api_result is None:
             raise ValueError("Unable to fetch info for character %r" % char_id)
-
+            
         _str, _int, _float, _bool, _ts = api.elem_getters(api_result)
 
         results = {
@@ -198,10 +208,11 @@ class EVE(object):
 
         return results
 
-    def alliances(self):
+    def alliances(self, api_result=None):
         """Return a dict of all alliances in EVE."""
 
-        api_result = self.api.get('eve/AllianceList')
+        if api_result is None:
+            api_result = self.api.get('eve/AllianceList')
 
         results = {}
         rowset = api_result.find('rowset')
@@ -229,10 +240,11 @@ class EVE(object):
 
         return results
 
-    def errors(self):
+    def errors(self, api_result=None):
         """Return a mapping of error codes to messages."""
 
-        api_result = self.api.get('eve/ErrorList')
+        if api_result is None:
+            api_result = self.api.get('eve/ErrorList')
 
         rowset = api_result.find('rowset')
         results = {}
@@ -243,10 +255,11 @@ class EVE(object):
 
         return results
 
-    def faction_warfare_stats(self):
+    def faction_warfare_stats(self, api_result=None):
         """Return various statistics from Faction Warfare."""
 
-        api_result = self.api.get('eve/FacWarStats')
+        if api_result is None:
+            api_result = self.api.get('eve/FacWarStats')
 
         totals = api_result.find('totals')
         rowsets = dict((r.attrib['name'], r) for r in api_result.findall('rowset'))
@@ -303,10 +316,11 @@ class EVE(object):
 
         return results
 
-    def skill_tree(self):
+    def skill_tree(self, api_result=None):
         """Return a dict of all available skill groups."""
 
-        api_result = self.api.get('eve/SkillTree')
+        if api_result is None:
+            api_result = self.api.get('eve/SkillTree')
 
         rowset = api_result.find('rowset') # skillGroups
 
@@ -385,10 +399,12 @@ class EVE(object):
         return results
 
 
-    def reference_types(self):
+    def reference_types(self, api_result=None):
         """Return a dict containing id -> name reference type mappings."""
 
-        api_result = self.api.get('eve/RefTypes')
+        if api_result is None:
+            api_result = self.api.get('eve/RefTypes')
+        
         rowset = api_result.find('rowset')
 
         results = {}
@@ -398,10 +414,11 @@ class EVE(object):
 
         return results
 
-    def faction_warfare_leaderboard(self):
+    def faction_warfare_leaderboard(self, api_result=None):
         """Return top-100 lists from Faction Warfare."""
 
-        api_result = self.api.get('eve/FacWarTopStats')
+        if api_result is None:
+            api_result = self.api.get('eve/FacWarTopStats')
 
         def parse_top_100(rowset, prefix, attr, attr_name):
             top100 = []
@@ -445,9 +462,10 @@ class EVE(object):
 
         return results
 
-    def conquerable_stations(self):
+    def conquerable_stations(self, api_result=None):
 
-        api_result = self.api.get('eve/ConquerableStationlist')
+        if api_result is None:
+            api_result = self.api.get('eve/ConquerableStationlist')
 
         results = {}
         rowset = api_result.find('rowset')
